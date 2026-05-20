@@ -1,0 +1,4 @@
+﻿Type,SKU,Name,Categories,Images,Parent,Attribute 1 name,Attribute 1 value(s),Attribute 2 name,Attribute 2 value(s),Regular price
+variable,KYX-TS-0001,Turtle Space Baskılı Tişört,Tişört,"https://example.com/turtle1.jpg,https://example.com/turtle2.jpg",,,,,,
+variation,KYX-TS-0001-BYZ-S,,,,KYX-TS-0001,Renk,Beyaz,Beden,S,399.9
+variation,KYX-TS-0001-SYH-M,,,,KYX-TS-0001,Renk,Siyah,Beden,M,399.9

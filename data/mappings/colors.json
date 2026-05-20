@@ -1,0 +1,38 @@
+{
+  "beyaz": {
+    "name": "Beyaz",
+    "code": "BYZ"
+  },
+  "siyah": {
+    "name": "Siyah",
+    "code": "SYH"
+  },
+  "kirmizi": {
+    "name": "Kırmızı",
+    "code": "KRM"
+  },
+  "kırmızı": {
+    "name": "Kırmızı",
+    "code": "KRM"
+  },
+  "mavi": {
+    "name": "Mavi",
+    "code": "MAV"
+  },
+  "yesil": {
+    "name": "Yeşil",
+    "code": "YSL"
+  },
+  "yeşil": {
+    "name": "Yeşil",
+    "code": "YSL"
+  },
+  "gri": {
+    "name": "Gri",
+    "code": "GRI"
+  },
+  "lacivert": {
+    "name": "Lacivert",
+    "code": "LCV"
+  }
+}

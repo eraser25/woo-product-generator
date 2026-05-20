@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+build/
+dist/
+installer_output/
+*.spec
+data/uploads/images/*
+data/uploads/csv/*
+data/uploads/image_cache.json
+data/license/license.json
+tools/private_key.pem
+licenses/*.key
+!.gitkeep
