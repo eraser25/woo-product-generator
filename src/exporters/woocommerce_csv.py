@@ -65,12 +65,14 @@ class WooCommerceCSVExporter:
     def _columns_for_attribute_count(self, count: int) -> list[str]:
         columns = list(self.base_columns)
         for index in range(1, max(count, 1) + 1):
-            columns.extend([
-                f"Attribute {index} name",
-                f"Attribute {index} value(s)",
-                f"Attribute {index} visible",
-                f"Attribute {index} global",
-            ])
+            columns.extend(
+                [
+                    f"Attribute {index} name",
+                    f"Attribute {index} value(s)",
+                    f"Attribute {index} visible",
+                    f"Attribute {index} global",
+                ]
+            )
         columns.extend(self.tail_columns)
         return columns
 
@@ -149,7 +151,11 @@ class WooCommerceCSVExporter:
 
     def _default_attributes(self, sizes: List[str], colors: List[dict]) -> list[dict]:
         attrs = []
-        color_values = [c.get("name", "") for c in colors if c.get("name")]
+        # Birden fazla görsel (ön/arka) aynı renk olduğu için listeyi tekilleştiriyoruz
+        color_values = list(
+            dict.fromkeys([c.get("name", "") for c in colors if c.get("name")])
+        )
+
         if color_values:
             attrs.append({"name": "Renk", "values": color_values, "global": 1})
         size_values = [str(size).strip() for size in sizes if str(size).strip()]
@@ -161,13 +167,19 @@ class WooCommerceCSVExporter:
         cleaned = []
         for attr in attributes or []:
             name = str(attr.get("name", "")).strip()
-            values = [str(value).strip() for value in attr.get("values", []) if str(value).strip()]
+            values = [
+                str(value).strip()
+                for value in attr.get("values", [])
+                if str(value).strip()
+            ]
             if name and values:
-                cleaned.append({
-                    "name": name,
-                    "values": values,
-                    "global": int(attr.get("global", 1)),
-                })
+                cleaned.append(
+                    {
+                        "name": name,
+                        "values": values,
+                        "global": int(attr.get("global", 1)),
+                    }
+                )
         return cleaned
 
     def _color_image_lookup(self, colors: list[dict]) -> dict:
@@ -175,10 +187,26 @@ class WooCommerceCSVExporter:
         for color in colors:
             name = str(color.get("name", "")).strip()
             if name:
-                lookup[ascii_key(name)] = self._normalize_images(color.get("image_urls", ""))
+                key = ascii_key(name)
+                existing_urls = lookup.get(key, "")
+                new_urls = self._normalize_images(color.get("image_urls", ""))
+
+                if new_urls:
+                    if existing_urls:
+                        # Arka/galeri görselini önceki URL'nin sonuna virgülle ekle
+                        lookup[key] = existing_urls + "," + new_urls
+                    else:
+                        # İlk kez (Ana görsel) ekleniyorsa doğrudan ata
+                        lookup[key] = new_urls
         return lookup
 
-    def _variation_image(self, combination: tuple[str, ...], attributes: list[dict], color_lookup: dict, parent_images: str) -> str:
+    def _variation_image(
+        self,
+        combination: tuple[str, ...],
+        attributes: list[dict],
+        color_lookup: dict,
+        parent_images: str,
+    ) -> str:
         for attr, value in zip(attributes, combination):
             if ascii_key(attr.get("name", "")) == "renk":
                 image = color_lookup.get(ascii_key(value))
@@ -224,8 +252,16 @@ class WooCommerceCSVExporter:
             existing_parent_id = str(item.get("existing_parent_id", "")).strip()
             existing_parent_sku = str(item.get("existing_parent_sku", "")).strip()
 
-            parent_id = existing_parent_id if update_mode and existing_parent_id else f"P{current_id:04d}"
-            parent_sku = existing_parent_sku if update_mode and existing_parent_sku else f"{brand_code}-{product_type_code}-{current_id:04d}"
+            parent_id = (
+                existing_parent_id
+                if update_mode and existing_parent_id
+                else f"P{current_id:04d}"
+            )
+            parent_sku = (
+                existing_parent_sku
+                if update_mode and existing_parent_sku
+                else f"{brand_code}-{product_type_code}-{current_id:04d}"
+            )
 
             parent_images = self._normalize_images(item.get("image_urls", ""))
             if not parent_images:
@@ -233,7 +269,9 @@ class WooCommerceCSVExporter:
                     [c.get("image_urls", "") for c in colors]
                 )
             if product_data.get("image_urls"):
-                parent_images = self._combine_unique_images([parent_images, product_data.get("image_urls", "")])
+                parent_images = self._combine_unique_images(
+                    [parent_images, product_data.get("image_urls", "")]
+                )
 
             tags = brand if brand else ""
 
@@ -262,7 +300,9 @@ class WooCommerceCSVExporter:
                 "Allow customer reviews?": 1,
                 "Purchase note": "",
                 "Sale price": "",
-                "Regular price": self._normalize_price(product_data.get("regular_price", "")),
+                "Regular price": self._normalize_price(
+                    product_data.get("regular_price", "")
+                ),
                 "Categories": category,
                 "Tags": tags,
                 "Shipping class": "",
@@ -284,7 +324,9 @@ class WooCommerceCSVExporter:
             rows.append(parent_row)
 
             color_lookup = self._color_image_lookup(colors)
-            combinations = list(product(*[attr["values"] for attr in active_attributes]))
+            combinations = list(
+                product(*[attr["values"] for attr in active_attributes])
+            )
             current_variation_id = current_id + 1
 
             for combination in combinations:
@@ -320,12 +362,18 @@ class WooCommerceCSVExporter:
                     "Height (in)": "",
                     "Allow customer reviews?": 0,
                     "Purchase note": "",
-                    "Sale price": self._normalize_price(product_data.get("sale_price", "")),
-                    "Regular price": self._normalize_price(product_data.get("regular_price", "")),
+                    "Sale price": self._normalize_price(
+                        product_data.get("sale_price", "")
+                    ),
+                    "Regular price": self._normalize_price(
+                        product_data.get("regular_price", "")
+                    ),
                     "Categories": "",
                     "Tags": "",
                     "Shipping class": "",
-                    "Images": self._variation_image(combination, active_attributes, color_lookup, parent_images),
+                    "Images": self._variation_image(
+                        combination, active_attributes, color_lookup, parent_images
+                    ),
                     "Download limit": "",
                     "Download expiry days": "",
                     "Parent": parent_sku,
@@ -334,7 +382,9 @@ class WooCommerceCSVExporter:
                     "Meta: _wpcom_is_markdown": "",
                 }
 
-                for index, (attr, value) in enumerate(zip(active_attributes, combination), start=1):
+                for index, (attr, value) in enumerate(
+                    zip(active_attributes, combination), start=1
+                ):
                     row[f"Attribute {index} name"] = attr["name"]
                     row[f"Attribute {index} value(s)"] = value
                     row[f"Attribute {index} visible"] = ""
@@ -346,13 +396,20 @@ class WooCommerceCSVExporter:
             current_id = current_variation_id
 
         columns = self._columns_for_attribute_count(
-            max([len(self._clean_attributes(attributes or []))] + [
-                len(row.keys()) for row in []
-            ])
+            max(
+                [len(self._clean_attributes(attributes or []))]
+                + [len(row.keys()) for row in []]
+            )
         )
         if rows:
             attr_count = max(
-                len([key for key in row if key.startswith("Attribute ") and key.endswith(" name")])
+                len(
+                    [
+                        key
+                        for key in row
+                        if key.startswith("Attribute ") and key.endswith(" name")
+                    ]
+                )
                 for row in rows
             )
             columns = self._columns_for_attribute_count(attr_count)
