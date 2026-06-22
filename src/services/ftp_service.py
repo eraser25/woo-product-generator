@@ -4,6 +4,7 @@ FTP/FTPS ile görsel yükleme servisi.
 
 from __future__ import annotations
 
+import streamlit as st
 import hashlib
 import io
 import re
@@ -52,7 +53,9 @@ class FTPImageUploader:
         """Bağlantı, klasör yazma izni ve public URL yapısını kontrol eder."""
         parsed = urlparse(self.public_base_url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError("Public base URL http veya https ile başlayan geçerli bir URL olmalı.")
+            raise ValueError(
+                "Public base URL http veya https ile başlayan geçerli bir URL olmalı."
+            )
 
         ftp = self._connect()
         test_filename = f"woo-product-generator-test-{hashlib.sha1(self.username.encode()).hexdigest()[:8]}.txt"
@@ -101,7 +104,7 @@ class FTPImageUploader:
     def _public_path_from_remote_dir(self, remote_dir: str) -> str:
         remote_dir_clean = self._normalize_remote_dir(remote_dir)
         if remote_dir_clean.startswith("public_html/"):
-            remote_dir_clean = remote_dir_clean[len("public_html/"):]
+            remote_dir_clean = remote_dir_clean[len("public_html/") :]
         return remote_dir_clean.strip("/")
 
     def _ensure_remote_dir(self, ftp, remote_dir: str) -> None:
@@ -169,8 +172,24 @@ class FTPImageUploader:
     ) -> Dict[str, Dict[str, Any]]:
         remote_base_dir_clean = self._normalize_remote_dir(remote_base_dir)
 
+        # 1. Yüklenecek toplam görsel sayısını bul (İlerleme çubuğu için)
+        total_images = 0
         for group_key, item in mapping_result.items():
-            group_dir = f"{remote_base_dir_clean}/{group_key}" if remote_base_dir_clean else group_key
+            for color in item.get("colors", []):
+                if color.get("image_bytes") and color.get("filename"):
+                    total_images += 1
+
+        # 2. İlerleme çubuğunu ve metin alanını oluştur
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        uploaded_count = 0
+
+        for group_key, item in mapping_result.items():
+            group_dir = (
+                f"{remote_base_dir_clean}/{group_key}"
+                if remote_base_dir_clean
+                else group_key
+            )
 
             gallery_urls = []
             for color in item.get("colors", []):
@@ -179,9 +198,12 @@ class FTPImageUploader:
 
                 if not image_bytes or not filename:
                     if color.get("image_urls"):
-                        gallery_urls.extend(self._split_urls(color.get("image_urls", "")))
+                        gallery_urls.extend(
+                            self._split_urls(color.get("image_urls", ""))
+                        )
                     continue
 
+                # 3. Görseli yükle
                 url = self.upload_bytes(
                     file_bytes=image_bytes,
                     remote_dir=group_dir,
@@ -190,11 +212,31 @@ class FTPImageUploader:
                 color["image_urls"] = url
                 gallery_urls.append(url)
 
+                # 4. İlerleme Çubuğunu Güncelle
+                uploaded_count += 1
+                if total_images > 0:
+                    yuzde = int((uploaded_count / total_images) * 100)
+                    progress_bar.progress(yuzde)
+                    status_text.caption(f"🚀 FTP'ye Yükleniyor: {filename} (%{yuzde})")
+
             parent_urls = self._split_urls(item.get("image_urls", ""))
             combined = self._unique_urls(parent_urls + gallery_urls)
             item["image_urls"] = ",".join(combined)
             item["main_image_url"] = combined[0] if combined else ""
-            item["gallery_image_urls"] = ",".join(combined[1:]) if len(combined) > 1 else ""
+            item["gallery_image_urls"] = (
+                ",".join(combined[1:]) if len(combined) > 1 else ""
+            )
+
+        # 5. İşlem bitince başarılı mesajı bas, bekle ve çubuğu gizle
+        if total_images > 0:
+            status_text.success(
+                f"✅ Toplam {total_images} görsel FTP'ye başarıyla yüklendi!"
+            )
+            import time
+
+            time.sleep(2)
+            progress_bar.empty()
+            status_text.empty()
 
         return mapping_result
 
